@@ -23,6 +23,7 @@
 
 use Cake\Routing\Route\DashedRoute;
 use Cake\Routing\RouteBuilder;
+use Cake\Routing\Router;
 
 /*
  * This file is loaded in the context of the `Application` class.
@@ -80,6 +81,26 @@ return function (RouteBuilder $routes): void {
          * routes you want in your application.
          */
         $builder->fallbacks();
+    });
+
+    // Example route for the articles index action
+    // $routes->scope('/api', function ($routes) {
+    //     $routes->setRouteClass(DashedRoute::class);
+    //     $routes->get('/articles', ['controller' => 'Articles', 'action' => 'index']);
+    // });
+    Router::prefix('api', function (RouteBuilder $routes) {
+        // Define routes for API endpoints
+        $routes->connect('/articles', ['controller' => 'Articles', 'action' => 'index']);
+        $routes->connect('/articles/:id', ['controller' => 'Articles', 'action' => 'view'])
+            ->setPatterns(['id' => '\d+'])
+            ->setPass(['id']);
+        $routes->post('/articles', ['controller' => 'Articles', 'action' => 'add']);
+        $routes->put('/articles/:id', ['controller' => 'Articles', 'action' => 'edit'])
+            ->setPatterns(['id' => '\d+'])
+            ->setPass(['id']);
+        $routes->delete('/articles/:id', ['controller' => 'Articles', 'action' => 'delete'])
+            ->setPatterns(['id' => '\d+'])
+            ->setPass(['id']);
     });
 
     /*
