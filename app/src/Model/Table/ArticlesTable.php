@@ -44,6 +44,15 @@ class ArticlesTable extends Table
         $this->setDisplayField('title');
         $this->setPrimaryKey('id');
 
+        $this->addBehavior('Timestamp', [
+            'events' => [
+                'Model.beforeSave' => [
+                    'created_at' => 'new',
+                    'updated_at' => 'always',
+                ]
+            ]
+        ]);
+
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
             'joinType' => 'INNER',
@@ -62,8 +71,19 @@ class ArticlesTable extends Table
     public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->integer('user_id')
-            ->notEmptyString('user_id');
+            ->scalar('user_id')
+            ->notEmptyString('user_id')
+            ->add('user_id', 'existsIn', [
+                'rule' => function ($value, $context) {
+                    // Kiểm tra xem giá trị của user_id có tồn tại trong bảng users hay không
+                    $usersTable = $this->getAssociation('Users');
+                    $query = $usersTable->find('all')->where(['id' => $value]);
+
+                    return $query->count() > 0;
+                },
+                'message' => 'This user ID does not exist in the users table',
+            ]);
+
 
         $validator
             ->scalar('title')
@@ -74,16 +94,6 @@ class ArticlesTable extends Table
         $validator
             ->scalar('body')
             ->allowEmptyString('body');
-
-        $validator
-            ->dateTime('created_at')
-            ->requirePresence('created_at', 'create')
-            ->notEmptyDateTime('created_at');
-
-        $validator
-            ->dateTime('updated_at')
-            ->requirePresence('updated_at', 'create')
-            ->notEmptyDateTime('updated_at');
 
         return $validator;
     }
