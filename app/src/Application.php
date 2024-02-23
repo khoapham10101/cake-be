@@ -33,6 +33,7 @@ use Cake\ORM\Locator\TableLocator;
 use Cake\Routing\Middleware\AssetMiddleware;
 use Cake\Routing\Middleware\RoutingMiddleware;
 use Cake\Routing\Router;
+use Cake\Utility\Security;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
@@ -109,7 +110,17 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
             // ]));
 
             // Add the AuthenticationMiddleware. It should be after routing and body parser.
-            ->add(new AuthenticationMiddleware($this));
+            ->add(new AuthenticationMiddleware($this))
+
+            ->add(function($request, $response, $next) {
+                return $next($request, $response)
+                    ->withHeader('Access-Control-Allow-Origin', '*')
+                    ->withHeader('Access-Control-Allow-Methods', '*')
+                    ->withHeader('Access-Control-Allow-Credentials', 'true')
+                    ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With')
+                    ->withHeader('Access-Control-Allow-Headers', 'Content-Type')
+                    ->withHeader('Access-Control-Allow-Type', 'application/json');
+            });
 
             $csrf = new CsrfProtectionMiddleware();
             $csrf->skipCheckCallback(function($request) {
@@ -119,17 +130,6 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
             });
 
         return $middlewareQueue;
-    }
-
-    /**
-     * Register application container services.
-     *
-     * @param \Cake\Core\ContainerInterface $container The Container to update.
-     * @return void
-     * @link https://book.cakephp.org/4/en/development/dependency-injection.html#dependency-injection
-     */
-    public function services(ContainerInterface $container): void
-    {
     }
 
     /**
@@ -157,19 +157,27 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
             IdentifierInterface::CREDENTIAL_PASSWORD => 'password'
         ];
 
-        // Load identifiers, ensure we check email and password fields
         $authenticationService->loadIdentifier('Authentication.Password', [
-            'fields' => [
-                'returnPayload' => false,
-                'fields' => $fields,
-            ]
+            'fields' => $fields
         ]);
 
-        // Load the authenticators, you want session first
-        $authenticationService->loadAuthenticator('Authentication.Session');
-        // Configure form data check to pick email and password
         $authenticationService->loadAuthenticator('Authentication.Form', [
             'fields' => $fields,
+        ]);
+
+        $authenticationService->loadAuthenticator('Authentication.Jwt', [
+            'secretKey' => Security::getSalt(),
+            'header' => 'Authorization',
+            // 'queryParam' => 'token',
+            'tokenPrefix' => 'Bearer',
+            'algorithm' => 'HS256',
+            'returnPayload' => false,
+        ]);
+
+        $authenticationService->loadIdentifier('Authentication.JwtSubject', [
+            // 'tokenField' => 'id',
+            // 'dataField' => 'id',
+            'algorithm' => 'HS256',
         ]);
 
         return $authenticationService;
