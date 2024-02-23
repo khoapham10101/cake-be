@@ -52,6 +52,14 @@ class ArticleLikesTable extends Table
             'foreignKey' => 'article_id',
             'joinType' => 'INNER',
         ]);
+
+        $this->addBehavior('Timestamp', [
+            'events' => [
+                'Model.beforeSave' => [
+                    'created_at' => 'new',
+                ]
+            ]
+        ]);
     }
 
     /**
@@ -69,11 +77,6 @@ class ArticleLikesTable extends Table
         $validator
             ->integer('article_id')
             ->notEmptyString('article_id');
-
-        $validator
-            ->dateTime('created_at')
-            ->requirePresence('created_at', 'create')
-            ->notEmptyDateTime('created_at');
 
         return $validator;
     }

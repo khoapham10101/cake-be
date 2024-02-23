@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Controller\AppController;
+use Cake\View\JsonView;
 
 /**
  * ArticleLikes Controller
@@ -13,102 +14,85 @@ use App\Controller\AppController;
  */
 class ArticleLikesController extends AppController
 {
-    /**
-     * Index method
-     *
-     * @return \Cake\Http\Response|null|void Renders view
-     */
-    public function index()
-    {
-        $this->paginate = [
-            'contain' => ['Users', 'Articles'],
-        ];
-        $articleLikes = $this->paginate($this->ArticleLikes);
 
-        $this->set(compact('articleLikes'));
+    public function viewClasses(): array
+    {
+        return [JsonView::class];
     }
 
-    /**
-     * View method
+   /**
+     * Add or remove favorite for the authenticated user.
      *
-     * @param string|null $id Article Like id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @param int $articleId
+     * @param string $action 'add' to add to favorites, 'remove' to remove from favorites
+     * @return \Cake\Http\Response
      */
-    public function view($id = null)
+    public function favorite()
     {
-        $articleLike = $this->ArticleLikes->get($id, [
-            'contain' => ['Users', 'Articles'],
-        ]);
+        $data = $this->request->getData();
+        $this->loadModel('Articles');
+        $userId = $this->Authentication->getIdentity()->get('id');
 
-        $this->set(compact('articleLike'));
-    }
+        $article = $this->Articles->find()
+        ->where(['id' => $data['article_id']])
+        ->first();
 
-    /**
-     * Add method
-     *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
-     */
-    public function add()
-    {
-        $articleLike = $this->ArticleLikes->newEmptyEntity();
-        if ($this->request->is('post')) {
-            $articleLike = $this->ArticleLikes->patchEntity($articleLike, $this->request->getData());
-            if ($this->ArticleLikes->save($articleLike)) {
-                $this->Flash->success(__('The article like has been saved.'));
-
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The article like could not be saved. Please, try again.'));
+        if (!$article) {
+            $this->set([
+                'success' => false,
+                'message' => sprintf('article %s not found', $data['article_id'])
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
-        $users = $this->ArticleLikes->Users->find('list', ['limit' => 200])->all();
-        $articles = $this->ArticleLikes->Articles->find('list', ['limit' => 200])->all();
-        $this->set(compact('articleLike', 'users', 'articles'));
-    }
 
-    /**
-     * Edit method
-     *
-     * @param string|null $id Article Like id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function edit($id = null)
-    {
-        $articleLike = $this->ArticleLikes->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $articleLike = $this->ArticleLikes->patchEntity($articleLike, $this->request->getData());
-            if ($this->ArticleLikes->save($articleLike)) {
-                $this->Flash->success(__('The article like has been saved.'));
+        // Check if the record already exists
+        $exists = $this->ArticleLikes->exists(['article_id' => $article->id, 'user_id' => $userId]);
 
-                return $this->redirect(['action' => 'index']);
+        if ($exists) {
+            $result = $this->ArticleLikes->deleteAll(['article_id' => $article->id, 'user_id' => $userId]);
+
+            if ($result) {
+                $message = 'Article removed from favorites.';
+            } else {
+                $message = 'Error removing article from favorites.';
             }
-            $this->Flash->error(__('The article like could not be saved. Please, try again.'));
-        }
-        $users = $this->ArticleLikes->Users->find('list', ['limit' => 200])->all();
-        $articles = $this->ArticleLikes->Articles->find('list', ['limit' => 200])->all();
-        $this->set(compact('articleLike', 'users', 'articles'));
-    }
-
-    /**
-     * Delete method
-     *
-     * @param string|null $id Article Like id.
-     * @return \Cake\Http\Response|null|void Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function delete($id = null)
-    {
-        $this->request->allowMethod(['post', 'delete']);
-        $articleLike = $this->ArticleLikes->get($id);
-        if ($this->ArticleLikes->delete($articleLike)) {
-            $this->Flash->success(__('The article like has been deleted.'));
         } else {
-            $this->Flash->error(__('The article like could not be deleted. Please, try again.'));
+
+            $articleUser = $this->ArticleLikes->newEntity(['article_id' => $article->id, 'user_id' => $userId]);
+
+            if ($this->ArticleLikes->save($articleUser)) {
+                $message = 'Article added to favorites.';
+            } else {
+                $errors = $articleUser->getErrors();
+                debug($errors);
+                $message = 'Error adding article to favorites.';
+            }
+
         }
 
-        return $this->redirect(['action' => 'index']);
+        $this->set([
+            'success' => true,
+            'message' => $message,
+        ]);
+
+        $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+    }
+
+    public function getFavoriteArticles()
+    {
+        $this->loadModel('Articles');
+        $userId = $this->Authentication->getIdentity()->get('id');
+
+        $favorites = $this->ArticleLikes->find('all', [
+            'conditions' => ['ArticleLikes.user_id' => $userId],
+            'contain' => ['Articles'],
+        ])->toArray();
+
+        $this->set([
+            'success' => true,
+            'data' => $favorites
+        ]);
+
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
     }
 }

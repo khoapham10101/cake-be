@@ -86,5 +86,27 @@ return function (RouteBuilder $routes): void {
             '/user/login',
             ['controller' => 'Auth', 'action' => 'login']
         );
+
+        $builder->post(
+            '/user/logout',
+            ['controller' => 'Auth', 'action' => 'logout']
+        );
+
+        $builder->post(
+            '/user/register',
+            ['controller' => 'Auth', 'action' => 'register']
+        );
+
+        $builder->get(
+            '/user/favorites',
+            ['controller' => 'ArticleLikes', 'action' => 'getFavoriteArticles']
+        );
+
+        $builder->post(
+            '/user/favorite',
+            ['controller' => 'ArticleLikes', 'action' => 'favorite']
+        );
+
+        $builder->fallbacks();
     });
 };
