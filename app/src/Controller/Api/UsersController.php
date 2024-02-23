@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Controller\AppController;
+use Cake\View\JsonView;
 
 /**
  * Users Controller
@@ -13,95 +14,118 @@ use App\Controller\AppController;
  */
 class UsersController extends AppController
 {
-    /**
-     * Index method
-     *
-     * @return \Cake\Http\Response|null|void Renders view
-     */
+    public function viewClasses(): array
+    {
+        return [JsonView::class];
+    }
+
     public function index()
     {
-        $users = $this->paginate($this->Users);
-
-        $this->set(compact('users'));
-    }
-
-    /**
-     * View method
-     *
-     * @param string|null $id User id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function view($id = null)
-    {
-        $user = $this->Users->get($id, [
-            'contain' => ['ArticleLikes', 'Articles'],
+        $users = $this->Users->find('all');
+        $this->set([
+            'success' => true,
+            'data' => $users
         ]);
-
-        $this->set(compact('user'));
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
     }
 
-    /**
-     * Add method
-     *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
-     */
+    public function view($id)
+    {
+        $user = $this->Users->find()
+            ->where(['id' => $id])
+            ->first();
+
+        if ($user) {
+            $this->set([
+                'success' => true,
+                'data' => $user
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+        } else {
+            $this->set([
+                'success' => false,
+                'message' => sprintf('User %s not found', $id)
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+        }
+    }
+
     public function add()
     {
-        $user = $this->Users->newEmptyEntity();
-        if ($this->request->is('post')) {
-            $user = $this->Users->patchEntity($user, $this->request->getData());
-            if ($this->Users->save($user)) {
-                $this->Flash->success(__('The user has been saved.'));
+        $user = $this->Users->newEntity($this->request->getData());
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The user could not be saved. Please, try again.'));
+        if ($user->hasErrors()) {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $user->getErrors()
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+        } elseif ($this->Users->save($user)) {
+            $this->set([
+                'success' => true,
+                'data' => $user,
+                'message' => 'Creation successful'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+        } else {
+            $this->set([
+                'success' => false,
+                'message' => 'Failed to add user'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
-        $this->set(compact('user'));
     }
 
-    /**
-     * Edit method
-     *
-     * @param string|null $id User id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function edit($id = null)
+    public function edit($id)
     {
-        $user = $this->Users->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $user = $this->Users->patchEntity($user, $this->request->getData());
-            if ($this->Users->save($user)) {
-                $this->Flash->success(__('The user has been saved.'));
+        $user = $this->Users->get($id);
 
-                return $this->redirect(['action' => 'index']);
+        if ($this->request->is(['patch', 'put'])) {
+            $user = $this->Users->patchEntity($user, $this->request->getData());
+
+            if ($user->hasErrors()) {
+                $this->response = $this->response->withStatus(400);
+                $this->set([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $user->getErrors()
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+            } elseif ($this->Users->save($user)) {
+                $this->set([
+                    'success' => true,
+                    'message' => 'Update successful',
+                    'data' => $user
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'data']);
+            } else {
+                $this->set([
+                    'success' => false,
+                    'message' => 'Failed to update user'
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message']);
             }
-            $this->Flash->error(__('The user could not be saved. Please, try again.'));
         }
-        $this->set(compact('user'));
     }
 
-    /**
-     * Delete method
-     *
-     * @param string|null $id User id.
-     * @return \Cake\Http\Response|null|void Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function delete($id = null)
+    public function delete($id)
     {
-        $this->request->allowMethod(['post', 'delete']);
+        $this->request->allowMethod(['delete']);
         $user = $this->Users->get($id);
         if ($this->Users->delete($user)) {
-            $this->Flash->success(__('The user has been deleted.'));
+            $this->set([
+                'success' => true,
+                'message' => 'User deleted'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         } else {
-            $this->Flash->error(__('The user could not be deleted. Please, try again.'));
+            $this->set([
+                'success' => false,
+                'message' => 'Failed to delete User'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
-
-        return $this->redirect(['action' => 'index']);
     }
 }

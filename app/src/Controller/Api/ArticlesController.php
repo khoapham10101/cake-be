@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controller\Api;
 
 use App\Controller\AppController;
+use Cake\View\JsonView;
 
 /**
  * Articles Controller
@@ -14,106 +15,126 @@ use App\Controller\AppController;
 class ArticlesController extends AppController
 {
 
-    public function initialize(): void
+    public function viewClasses(): array
     {
-        parent::initialize();
-        $this->loadComponent('RequestHandler');
-        $this->disableAutoRender(); // Disable view rendering for API actions
+        return [JsonView::class];
     }
 
-    /**
-     * Index method
-     *
-     */
     public function index()
     {
-        $articles = $this->Articles->find()->all();
-        var_dump($articles);
-        die;
-        // $this->set(compact('articles'));
-        // $this->viewBuilder()->setOption('serialize', ['articles']);
-        return json_encode(['aaData' => $articles]);
-    }
-
-    /**
-     * View method
-     *
-     * @param string|null $id Article id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function view($id = null)
-    {
-        $article = $this->Articles->get($id, [
-            'contain' => ['Users', 'ArticleLikes'],
+        $articles = $this->Articles->find('all');
+        $this->set([
+            'success' => true,
+            'data' => $articles
         ]);
-
-        $this->set(compact('article'));
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
     }
 
-    /**
-     * Add method
-     *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
-     */
+    public function view($id)
+    {
+        $article = $this->Articles->find()
+            ->where(['id' => $id])
+            ->first();
+
+        if ($article) {
+            $this->set([
+                'success' => true,
+                'data' => $article
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+        } else {
+            $this->set([
+                'success' => false,
+                'message' => sprintf('article %s not found', $id)
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+        }
+    }
+
     public function add()
     {
-        $article = $this->Articles->newEmptyEntity();
-        if ($this->request->is('post')) {
-            $article = $this->Articles->patchEntity($article, $this->request->getData());
-            if ($this->Articles->save($article)) {
-                $this->Flash->success(__('The article has been saved.'));
+        $article = $this->Articles->newEntity($this->request->getData());
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The article could not be saved. Please, try again.'));
+        if ($article->hasErrors()) {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $article->getErrors()
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+        } elseif ($this->Articles->save($article)) {
+            $this->set([
+                'success' => true,
+                'data' => $article,
+                'message' => 'Creation successful'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+        } else {
+            $this->set([
+                'success' => false,
+                'message' => 'Failed to add article'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
-        $users = $this->Articles->Users->find('list', ['limit' => 200])->all();
-        $this->set(compact('article', 'users'));
     }
 
-    /**
-     * Edit method
-     *
-     * @param string|null $id Article id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function edit($id = null)
+    public function edit($id)
     {
-        $article = $this->Articles->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $article = $this->Articles->patchEntity($article, $this->request->getData());
-            if ($this->Articles->save($article)) {
-                $this->Flash->success(__('The article has been saved.'));
+        $article = $this->Articles->get($id);
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The article could not be saved. Please, try again.'));
+        if (!$article) {
+            $this->set([
+                'success' => false,
+                'message' => 'Artiles not found'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
         }
-        $users = $this->Articles->Users->find('list', ['limit' => 200])->all();
-        $this->set(compact('article', 'users'));
+
+        if ($this->request->is(['patch', 'put'])) {
+            $article = $this->Articles->patchEntity($article, $this->request->getData());
+
+            if ($article->hasErrors()) {
+                $this->response = $this->response->withStatus(400);
+                $this->set([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $article->getErrors()
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+            } elseif ($this->Articles->save($article)) {
+                $this->set([
+                    'success' => true,
+                    'message' => 'Update successful',
+                    'data' => $article
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'data']);
+            } else {
+                $this->set([
+                    'success' => false,
+                    'message' => 'Failed to update article'
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            }
+        }
     }
 
-    /**
-     * Delete method
-     *
-     * @param string|null $id Article id.
-     * @return \Cake\Http\Response|null|void Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
-     */
-    public function delete($id = null)
+    public function delete($id)
     {
-        $this->request->allowMethod(['post', 'delete']);
+        $this->request->allowMethod(['delete']);
         $article = $this->Articles->get($id);
         if ($this->Articles->delete($article)) {
-            $this->Flash->success(__('The article has been deleted.'));
+            $this->set([
+                'success' => true,
+                'message' => 'article deleted'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         } else {
-            $this->Flash->error(__('The article could not be deleted. Please, try again.'));
+            $this->set([
+                'success' => false,
+                'message' => 'Failed to delete article'
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
-
-        return $this->redirect(['action' => 'index']);
     }
 }
