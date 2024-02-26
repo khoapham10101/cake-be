@@ -38,14 +38,10 @@ The application should now be accessible at http://localhost:34251
 
 ## How to check
 
-### Authentication
+Clone code of [this repo](https://github.com/khoapham10101/cake-fe) and follow its README as well
 
-TODO: pls summarize how to check "Authentication" bahavior
+## Credential
 
-### Article Management
+User name: user1@hltech.com
 
-TODO: pls summarize how to check "Article Management" bahavior
-
-### Like Feature
-
-TODO: pls summarize how to check "Like Feature" bahavior
+Password: password
